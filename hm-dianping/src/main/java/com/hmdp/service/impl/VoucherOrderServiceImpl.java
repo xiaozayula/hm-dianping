@@ -47,11 +47,14 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             return Result.fail("秒杀券已抢空");
         }
         // 5、秒杀券合法，则秒杀券抢购成功，秒杀券库存数量减一
-        boolean flag = seckillVoucherService.update(new LambdaUpdateWrapper<SeckillVoucher>()
-                .eq(SeckillVoucher::getVoucherId, voucherId)
-                .setSql("stock = stock -1"));
+        boolean flag = seckillVoucherService.update()
+                .setSql("stock = stock -1")
+                .eq("voucher_id", voucherId)
+                .gt("stock", 0)
+                .update();
+
         if (!flag){
-            throw new RuntimeException("秒杀券扣减失败");
+            return  Result.fail("库存不足");
         }
         // 6、秒杀成功，创建对应的订单，并保存到数据库
         VoucherOrder voucherOrder = new VoucherOrder();
