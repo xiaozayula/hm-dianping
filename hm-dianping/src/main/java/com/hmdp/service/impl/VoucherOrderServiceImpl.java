@@ -10,6 +10,7 @@ import com.hmdp.service.IVoucherOrderService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.utils.RedisIdWorker;
 import com.hmdp.utils.UserHolder;
+import org.springframework.aop.framework.AopContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,7 +30,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
      * @param voucherId
      * @return
      */
-    @Transactional
+
     @Override
     public Result seckillVoucher(Long voucherId) {
         // 1、查询秒杀券
@@ -46,21 +47,37 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         if (voucher.getStock() < 1) {
             return Result.fail("秒杀券已抢空");
         }
+        Long userId=UserHolder.getUser().getId();
+        synchronized (userId.toString().intern()) {
+            IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
+            return proxy.createVoucherOrder(voucherId);
+        }
+
+    }
+    @Transactional
+    public  Result createVoucherOrder(Long voucherId) {
+        //一人一单
+        Long userId=UserHolder.getUser().getId();
+
+        int count = query().eq("user_id", userId).eq("voucher_id", voucherId).count();
+        if(count>0){
+            return Result.fail("用户已经购买过了");
+        }
         // 5、秒杀券合法，则秒杀券抢购成功，秒杀券库存数量减一
         boolean flag = seckillVoucherService.update()
                 .setSql("stock = stock -1")
                 .eq("voucher_id", voucherId)
                 .gt("stock", 0)
                 .update();
-
         if (!flag){
-            return  Result.fail("库存不足");
+            return Result.fail("库存不足");
         }
+
         // 6、秒杀成功，创建对应的订单，并保存到数据库
         VoucherOrder voucherOrder = new VoucherOrder();
         long orderId = redisIdWorker.nextId("order");
         voucherOrder.setId(orderId);
-        voucherOrder.setUserId(UserHolder.getUser().getId());
+        voucherOrder.setUserId(userId);
         voucherOrder.setVoucherId(voucherId);
         flag = this.save(voucherOrder);
         if (!flag){
