@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 @Data
 @EqualsAndHashCode(callSuper = false)
 @Accessors(chain = true)
-@TableName("tb_blog_comments")
+@TableName("tb_blog_comments")//其他用户对探店笔记的评价
 public class BlogComments implements Serializable {
 
     private static final long serialVersionUID = 1L;
